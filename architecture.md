@@ -1,13 +1,12 @@
 # Architecture & Engineering Specification
-## Project: The Lenny Growth Assistant
-**Author:** Forward Deployed Engineer  
-**Status:** Approved for Implementation  
 
 ---
 
 ## 1. System Architecture Overview
 
-The Lenny Growth Assistant is engineered as a modular, local-first RAG application with dual LLM engine support, PostgreSQL persistence, and a sandboxed artifact viewer.
+The Lenny Growth Assistant is engineered as a modular, local-first RAG application using **PydanticAI** for type-safe agent orchestration, dual LLM engine support (Ollama + optional Cloud), PostgreSQL persistence, and a sandboxed artifact viewer.
+
+![System Architecture](images/architecture.png)
 
 ```mermaid
 flowchart TB
@@ -23,15 +22,15 @@ flowchart TB
         LogEngine["Structured JSON Logger\n& Observability Middleware"]
     end
 
-    subgraph Agent_Core ["Agent & Intelligence Layer"]
-        Orchestrator["Agent Orchestrator\n(Prompt Assembly & Guardrails)"]
+    subgraph Agent_Core ["PydanticAI Agent Layer"]
+        Orchestrator["PydanticAI Agent\n(Type-Safe Structured Output & Deps)"]
         Ship30Skill["Ship 30 for 30\nEssay Generation Skill"]
         ArtifactExtractor["Artifact Parser & Sanitizer\n(HTML/Markdown/CSS)"]
     end
 
-    subgraph LLM_Adapters ["LLM Provider Abstraction Layer"]
-        OllamaAdapter["Local Ollama Client\n(llama3.2 / mistral)"]
-        CloudAdapter["Cloud LLM Client\n(Claude / OpenAI / Gemini)"]
+    subgraph LLM_Adapters ["LLM Provider Layer (PydanticAI Models)"]
+        OllamaAdapter["Local Ollama Model\n(llama3.2 / mistral via Ollama/OpenAI-compat)"]
+        CloudAdapter["Cloud LLM Model\n(Claude / OpenAI / Gemini)"]
     end
 
     subgraph Knowledge_Engine ["Knowledge & RAG Pipeline"]
@@ -50,11 +49,11 @@ flowchart TB
     Router --> Validation
     Validation --> Orchestrator
     
-    Orchestrator -->|1. Query Embeddings| Embeddings
+    Orchestrator -->|1. Query Embeddings via Tool/Deps| Embeddings
     Embeddings -->|2. Search Vector Chunks| VectorDB
     VectorDB -->|3. Return Grounded Citations| Orchestrator
     
-    Orchestrator -->|4. Route to Active Engine| OllamaAdapter
+    Orchestrator -->|4. Dynamic Model Routing| OllamaAdapter
     Orchestrator -.->|Optional Cloud Fallback| CloudAdapter
     
     Orchestrator -->|5. Apply Essay Formatting| Ship30Skill
@@ -74,9 +73,9 @@ flowchart TB
 | **Frontend Web App** | Modern conversational interface, session switcher, interactive citation pills, and Claude-style split-screen Artifact Viewer. | React 18 / Vite, Vanilla CSS design system, Lucide icons. |
 | **API Gateway** | REST contracts, request validation, CORS, health checks, structured error propagation, streaming support. | FastAPI, Uvicorn, Pydantic v2. |
 | **Knowledge & RAG Engine** | Ingestion of Lenny transcripts, semantic chunking (500 tokens / 100 token overlap), embedding generation, top-k vector retrieval, and relevance scoring. | `sentence-transformers/all-MiniLM-L6-v2`, `chromadb` / local vector index. |
-| **Agent Orchestrator** | Grounded prompt assembly, XML boundary injection, multi-turn history injection, citation enforcement, and failure refusal logic. | Python Agent Pattern with strict prompt schemas. |
-| **Ship 30 for 30 Skill** | Specialized transformer that structures grounded insights into a 1,250-word digital essay with proven hooks, bolding, 1-3-1 cadence, and actionable summaries. | Structured Skill Engine. |
-| **LLM Provider Abstraction** | Flexible configuration layer dynamically routing prompts to local Ollama (`llama3.2`) or Cloud providers (Anthropic/OpenAI) with zero application code changes. | `BaseLLMClient`, `httpx` async client. |
+| **Agent Orchestrator** | Type-safe agent with dependency injection (`RunContext`), structured outputs (`result_type`), dynamic system prompts, XML guardrails, and citation enforcement. | **PydanticAI** (`pydantic-ai`). |
+| **Ship 30 for 30 Skill** | Specialized transformer that structures grounded insights into a 1,250-word digital essay with proven hooks, bolding, 1-3-1 cadence, and actionable summaries. | PydanticAI Skill & Structured Output Schema. |
+| **LLM Provider Abstraction** | Seamless switching between local Ollama (`llama3.2`) and Cloud providers (Anthropic/OpenAI) using PydanticAI model providers. | PydanticAI `Model` abstractions (`OllamaModel`, `AnthropicModel`, `OpenAIChatModel`). |
 | **Persistence Layer** | Relational storage for sessions, messages, citations, and generated artifacts with ACID guarantees. | PostgreSQL 15, SQLAlchemy 2.0 ORM, Alembic migrations. |
 | **Security Sandbox** | HTML sanitization and iframe attribute isolation (`sandbox="allow-scripts"`). | DOMPurify / Bleach, isolated iframe. |
 

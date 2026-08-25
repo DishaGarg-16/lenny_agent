@@ -1,13 +1,7 @@
-# Product Requirements Document (PRD)
-## Project: The Lenny Growth Assistant
-**Author:** Forward Deployed Engineer  
-**Status:** Approved for Implementation  
-**Target Delivery:** 2026-08-25  
+# Product Requirements: The Lenny Growth Assistant
 
----
-
-## 1. Executive Summary & Engagement Scenario
-"The Lenny Growth Assistant" is an internal AI-powered conversational web application designed for Product Managers, Growth Leads, Founders, and Operators. It transforms 200+ hours of raw, unstructured transcripts from *Lenny's Podcast* and newsletter archive into a reliable, grounded knowledge assistant.
+## 1. Overview
+The Lenny Growth Assistant is a conversational AI web application designed for Product Managers, Growth Leads, Founders, and Operators. It transforms 200+ hours of transcripts from *Lenny's Podcast* into a reliable, grounded knowledge assistant.
 
 Users can:
 1. Ask nuanced product, growth, leadership, and operational questions and receive answers strictly grounded in podcast knowledge with precise episode/guest citations.
@@ -17,9 +11,7 @@ Users can:
 
 ---
 
-## 2. Forward Deployment Brief
-
-### 2.1 User Personas & Problem Statement
+## 2. Target Users & Problem Statement
 
 | Persona | Primary Job-To-Be-Done (JTBD) | Pain Points Removed |
 | :--- | :--- | :--- |
@@ -126,13 +118,3 @@ flowchart TD
 * **Trigger:** Assistant generates an HTML/CSS landing page snippet, interactive calculator, or structured markdown framework.
 * **Process:** Frontend detects artifact code blocks (````html ... ```` or ````markdown ... ````), slides open the side-by-side Artifact Drawer, and renders the sandboxed live preview.
 * **User Controls:** Live Preview tab, Raw Code tab, Copy to Clipboard, Fullscreen toggle, and Download.
-
----
-
-## 7. Acceptance Criteria
-
-1. **Local Demo Guarantee:** The application boots and answers queries using local Ollama (`llama3.2`) with 0 external API keys configured.
-2. **Grounded Accuracy:** Every factual answer cites the transcript source.
-3. **Side-by-Side Artifact Viewer:** Generates and renders HTML/CSS and Markdown natively inside the product.
-4. **Session Persistence:** Chat sessions and message histories persist across browser reloads via PostgreSQL.
-5. **Observability:** Structured logs emitted for all queries, model invocations, retrieval scores, and error events.

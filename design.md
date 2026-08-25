@@ -1,7 +1,4 @@
-# Design Document (UI/UX & Frontend Architecture)
-## Project: The Lenny Growth Assistant
-**Author:** Forward Deployed Engineer  
-**Status:** Approved for Implementation  
+# Design Document: UI/UX & Frontend Architecture
 
 ---
 
