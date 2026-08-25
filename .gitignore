@@ -34,10 +34,13 @@ ENV/
 env/
 
 # Vector database & Local storage
+data/vector_db/
 chroma_db/
 .chroma/
 vector_index/
 data/chroma/
+data/chroma_db/
+*.sqlite
 *.sqlite3
 *.db
 

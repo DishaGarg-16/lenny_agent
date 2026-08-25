@@ -58,7 +58,7 @@ Users can:
 │ • "Ship 30 for 30" 1,250-word essay generator│   (Reason: Unnecessary latency & GPU cost;   │
 │ • Split-screen Claude-style Artifact Viewer  │    curated transcripts provide higher fidelity)│
 │ • Local Ollama + Cloud Provider switch       │ • Paid vector cloud databases (Pinecone/Qdrant│
-│ • Multi-turn session persistence (Postgres)  │   (Reason: Local ChromaDB/pgvector is 100%   │
+│ • Multi-turn session persistence (Postgres)  │   (Reason: Local SQLite/pgvector is 100%     │
 │ • Iframe HTML/CSS sandbox security layer     │    free and requires zero external accounts) │
 │ • Structured JSON logging & health checks    │ • Complex multi-tenant enterprise IAM / RBAC │
 │ • Automated test suite (Pytest + API tests)  │   (Reason: Premature optimization for demo)  │

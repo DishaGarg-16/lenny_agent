@@ -36,7 +36,7 @@ flowchart TB
     subgraph Knowledge_Engine ["Knowledge & RAG Pipeline"]
         Ingestion["Transcript Ingestion\n& Semantic Chunker"]
         Embeddings["Local Embedding Model\n(sentence-transformers all-MiniLM-L6-v2)"]
-        VectorDB[("ChromaDB / Vector Store\n(Top-K Similarity Search)")]
+        VectorDB[("SQLite Vector Store\n(Cosine Similarity Search)")]
     end
 
     subgraph Storage ["Persistence Layer"]
@@ -72,7 +72,7 @@ flowchart TB
 | :--- | :--- | :--- |
 | **Frontend Web App** | Modern conversational interface, session switcher, interactive citation pills, and Claude-style split-screen Artifact Viewer. | React 18 / Vite, Vanilla CSS design system, Lucide icons. |
 | **API Gateway** | REST contracts, request validation, CORS, health checks, structured error propagation, streaming support. | FastAPI, Uvicorn, Pydantic v2. |
-| **Knowledge & RAG Engine** | Ingestion of Lenny transcripts, semantic chunking (500 tokens / 100 token overlap), embedding generation, top-k vector retrieval, and relevance scoring. | `sentence-transformers/all-MiniLM-L6-v2`, `chromadb` / local vector index. |
+| **Knowledge & RAG Engine** | Ingestion of Lenny transcripts, semantic chunking (500 tokens / 100 token overlap), embedding generation, top-k vector retrieval, and relevance scoring. | `sentence-transformers/all-MiniLM-L6-v2`, `sqlite3` + `numpy` vector store. |
 | **Agent Orchestrator** | Type-safe agent with dependency injection (`RunContext`), structured outputs (`result_type`), dynamic system prompts, XML guardrails, and citation enforcement. | **PydanticAI** (`pydantic-ai`). |
 | **Ship 30 for 30 Skill** | Specialized transformer that structures grounded insights into a 1,250-word digital essay with proven hooks, bolding, 1-3-1 cadence, and actionable summaries. | PydanticAI Skill & Structured Output Schema. |
 | **LLM Provider Abstraction** | Seamless switching between local Ollama (`llama3.2`) and Cloud providers (Anthropic/OpenAI) using PydanticAI model providers. | PydanticAI `Model` abstractions (`OllamaModel`, `AnthropicModel`, `OpenAIChatModel`). |
@@ -246,7 +246,7 @@ flowchart LR
 │                       ▼                                 ▼   │
 │              ┌──────────────────┐             ┌────────────┐│
 │              │    postgres-db   │             │ Vector     ││
-│              │    PostgreSQL 15 │             │ ChromaDB   ││
+│              │    PostgreSQL 15 │             │ SQLite DB  ││
 │              │    Port: 5432    │             │ Local Vol  ││
 │              └──────────────────┘             └────────────┘│
 └─────────────────────────────────────────────────────────────┘
