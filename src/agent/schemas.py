@@ -2,7 +2,6 @@ from typing import List, Optional
 from pydantic import BaseModel, Field
 from src.knowledge.schemas import Citation
 
-
 class AgentResponse(BaseModel):
     """Structured response from the Lenny Growth Assistant Agent."""
     answer: str = Field(..., description="Conversational, grounded response")
@@ -12,7 +11,6 @@ class AgentResponse(BaseModel):
     artifact_content: Optional[str] = Field(None, description="Raw markdown or HTML artifact code")
     model_used: str = Field(..., description="Identifier of the model that generated this response")
     is_grounded: bool = Field(True, description="Whether the answer is grounded in transcript sources")
-
 
 class Ship30EssayResponse(BaseModel):
     """Structured output for a Ship 30 for 30 digital essay."""
