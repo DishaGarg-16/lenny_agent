@@ -14,7 +14,7 @@ export default function App() {
   const [currentSessionId, setCurrentSessionId] = useState(null);
   const [currentTitle, setCurrentTitle] = useState("New Conversation");
   const [messages, setMessages] = useState([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const [generatingSessionId, setGeneratingSessionId] = useState(null);
 
   const [models, setModels] = useState([]);
   const [activeModel, setActiveModel] = useState("ollama/llama3.2");
@@ -82,9 +82,17 @@ export default function App() {
   };
 
   const handleSendMessage = async (userText, skill = "default") => {
+    const activeId = currentSessionId;
     const userMsg = { id: `u-${Date.now()}`, role: "user", content: userText, created_at: new Date().toISOString() };
     setMessages((prev) => [...prev, userMsg]);
-    setIsLoading(true);
+    setGeneratingSessionId(activeId || "pending");
+
+    const formattedTitle = userText.slice(0, 32) + (userText.length > 32 ? "..." : "");
+    if (currentTitle === "New Conversation") {
+      setCurrentTitle(formattedTitle);
+      setSessions((prev) => prev.map((s) => (s.id === currentSessionId ? { ...s, title: formattedTitle } : s)));
+    }
+
     try {
       const res = skill === "ship30"
         ? await generateShip30Essay(currentSessionId, userText, null, activeModel)
@@ -92,14 +100,14 @@ export default function App() {
 
       if (!currentSessionId && res.session_id) {
         setCurrentSessionId(res.session_id);
-        setSessions((prev) => [{ id: res.session_id, title: userText.slice(0, 30) + "..." }, ...prev]);
+        setSessions((prev) => [{ id: res.session_id, title: formattedTitle }, ...prev]);
       }
       setMessages((prev) => [...prev, { id: res.message_id, role: "assistant", content: res.content, citations: res.citations || [], artifact: res.artifact || null }]);
       if (res.artifact) { setActiveArtifact(res.artifact); setIsArtifactOpen(true); }
     } catch (err) {
       setMessages((prev) => [...prev, { id: `err-${Date.now()}`, role: "assistant", content: `⚠️ Error: ${err.message}` }]);
     } finally {
-      setIsLoading(false);
+      setGeneratingSessionId(null);
     }
   };
 
@@ -109,7 +117,13 @@ export default function App() {
       <div className="main-stage">
         <Header sessionTitle={currentTitle} models={models} activeModel={activeModel} onSelectModel={setActiveModel} theme={theme} onToggleTheme={() => setTheme(theme === "dark" ? "light" : "dark")} hasActiveArtifact={Boolean(activeArtifact)} isArtifactOpen={isArtifactOpen} onToggleArtifact={() => setIsArtifactOpen(!isArtifactOpen)} />
         <div className="split-workspace">
-          <ChatArea messages={messages} isLoading={isLoading} onSendMessage={handleSendMessage} onOpenCitation={setSelectedCitation} onOpenArtifact={(art) => { setActiveArtifact(art); setIsArtifactOpen(true); }} />
+          <ChatArea
+            messages={messages}
+            isLoading={generatingSessionId !== null && (generatingSessionId === currentSessionId || generatingSessionId === "pending")}
+            onSendMessage={handleSendMessage}
+            onOpenCitation={setSelectedCitation}
+            onOpenArtifact={(art) => { setActiveArtifact(art); setIsArtifactOpen(true); }}
+          />
           {isArtifactOpen && activeArtifact && <ArtifactViewer artifact={activeArtifact} onClose={() => setIsArtifactOpen(false)} />}
         </div>
       </div>

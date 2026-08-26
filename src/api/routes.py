@@ -24,7 +24,7 @@ def get_retriever() -> TranscriptRetriever:
     global _retriever
     if _retriever is None:
         db_dir = os.getenv("VECTOR_DB_DIR", "./data/vector_db")
-        threshold = float(os.getenv("SIMILARITY_THRESHOLD", "0.35"))
+        threshold = float(os.getenv("SIMILARITY_THRESHOLD", "0.25"))
         _retriever = TranscriptRetriever(persist_directory=db_dir, similarity_threshold=threshold)
     return _retriever
 
@@ -125,7 +125,10 @@ async def chat_endpoint(req: ChatRequest, db: AsyncSession = Depends(get_db), re
     repo = ChatRepository(db)
     session = await repo.get_session(req.session_id) if req.session_id else None
     if not session:
-        session = await repo.create_session(title=clean_message[:40] + "...")
+        session = await repo.create_session(title=clean_message[:40] + ("..." if len(clean_message) > 40 else ""))
+    elif session.title == "New Conversation":
+        session.title = clean_message[:40] + ("..." if len(clean_message) > 40 else "")
+        await db.commit()
     session_id = session.id
     await repo.add_message(session_id=session_id, role="user", content=clean_message)
     chat_history = [{"role": m.role, "content": m.content} for m in session.messages[-6:]] if session.messages else []
@@ -156,12 +159,25 @@ async def ship30_endpoint(req: Ship30Request, db: AsyncSession = Depends(get_db)
     session = await repo.get_session(req.session_id) if req.session_id else None
     if not session:
         session = await repo.create_session(title=session_title)
+    elif session.title == "New Conversation":
+        session.title = session_title
+        await db.commit()
     session_id = session.id
     user_prompt = f"Write a Ship 30 for 30 essay on: {clean_topic}" + (f" (Focus: {req.guest_filter})" if req.guest_filter else "")
     await repo.add_message(session_id=session_id, role="user", content=user_prompt)
     llm_client = get_llm_client(req.model_override)
     skill = Ship30Skill(retriever=retriever, llm_client=llm_client)
     essay_resp = await skill.generate_essay(topic=clean_topic, guest_filter=req.guest_filter)
+
+    # Do not create empty artifacts on rejected / out-of-scope topics
+    if essay_resp.word_count == 0 or len(essay_resp.citations) == 0:
+        refusal_text = "This topic is not covered in Lenny's Podcast transcripts."
+        asst_msg = await repo.add_message(session_id=session_id, role="assistant", content=refusal_text, model_used=llm_client.model_name)
+        return ChatResponse(
+            session_id=session_id, message_id=asst_msg.id, role="assistant", content=refusal_text, model_used=llm_client.model_name,
+            citations=[], artifact=None, is_grounded=False
+        )
+
     summary_text = f"Here is your **Ship 30 for 30** essay on **{clean_topic}** ({essay_resp.word_count} words):\n\n> *\"{essay_resp.hook}\"*\n\nThe full essay has been loaded into the **Artifact Viewer** on the right."
     citations_payload = [c.model_dump() for c in essay_resp.citations]
     asst_msg = await repo.add_message(session_id=session_id, role="assistant", content=summary_text, model_used=llm_client.model_name, citations=citations_payload)
@@ -171,7 +187,7 @@ async def ship30_endpoint(req: Ship30Request, db: AsyncSession = Depends(get_db)
     artifact_res = ArtifactResponse(id=saved_art.id, session_id=saved_art.session_id, title=saved_art.title, artifact_type=saved_art.artifact_type, content=saved_art.content, version=saved_art.version, created_at=saved_art.created_at)
     return ChatResponse(
         session_id=session_id, message_id=asst_msg.id, role="assistant", content=summary_text, model_used=llm_client.model_name,
-        citations=[CitationResponse(**c.model_dump()) for c in essay_resp.citations], artifact=artifact_res, is_grounded=len(essay_resp.citations) > 0
+        citations=[CitationResponse(**c.model_dump()) for c in essay_resp.citations], artifact=artifact_res, is_grounded=True
     )
 
 @router.get("/api/artifacts/{artifact_id}", response_model=ArtifactResponse)

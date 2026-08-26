@@ -30,7 +30,7 @@ class TranscriptRetriever:
         collection_name: str = "lenny_transcripts",
         ollama_base_url: str = "http://localhost:11434",
         embedding_model: str = "nomic-embed-text",
-        similarity_threshold: float = 0.35
+        similarity_threshold: float = 0.25
     ):
         self.persist_directory = persist_directory
         self.collection_name = collection_name
@@ -234,6 +234,10 @@ class TranscriptRetriever:
                 score = min(1.0, score + 0.30)
 
             topics = [t.strip() for t in topics_str.split(",") if t.strip()]
+            for topic in topics:
+                if topic.lower() in query_lower:
+                    score = min(1.0, score + 0.25)
+                    break
 
             scored_results.append((score, {
                 "chunk_id": chunk_id,

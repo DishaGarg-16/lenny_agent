@@ -36,7 +36,11 @@ class Ship30Skill:
 
     async def generate_essay(self, topic: str, guest_filter: Optional[str] = None) -> Ship30EssayResponse:
         """Retrieves transcripts, applies Ship 30 frameworks, and generates a formatted 1,250-word digital essay."""
-        search_query = f"{topic} {guest_filter}" if guest_filter else topic
+        cleaned_topic = re.sub(
+            r"^(write\s+a\s+ship\s*30\s*(for\s*30)?\s*essay\s*on|write\s+an\s*essay\s*on|ship\s*30\s*essay\s*on|essay\s*on)\s*:?\s*",
+            "", topic, flags=re.IGNORECASE
+        ).strip()
+        search_query = f"{cleaned_topic} {guest_filter}" if guest_filter else cleaned_topic
         retrieval = self.retriever.retrieve(search_query, top_k=6)
         if not retrieval.is_grounded or not retrieval.chunks:
             return Ship30EssayResponse(
