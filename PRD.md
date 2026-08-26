@@ -30,7 +30,8 @@ Users can:
 * **Grounding Precision & Source Attribution:** 100% of factual claims in generated answers must provide verifiable citations (Episode Title, Guest Name, and approximate Timestamp/Context).
 * **Hallucination Rate (Out-of-Scope Queries):** 0% ungrounded responses. If a user asks a question not covered in the transcript corpus (e.g., *"How do I bake sourdough bread?"*), the system must explicitly acknowledge the lack of coverage rather than fabricate an answer.
 * **Ship 30 for 30 Essay Quality:** Generated essays must adhere to a target length of ~1,250 words, featuring a captivating hook, 1-3-1 rhythmic cadence, bolded skim-friendly takeaways, and clear tactical action items.
-* **Retrieval Relevance:** Top-3 cosine similarity retrieval must exceed a score of `0.65` for in-domain queries.
+* **Retrieval Relevance & Grounding Gate:** Calibrated similarity threshold gating (`>= 0.25`) enforcing deterministic refusal for out-of-scope queries while ensuring high recall for concise 3-word topic prompts.
+* **Rate Limiting & Concurrency Defense:** In-memory sliding window rate limiter (30 req/min per IP) and an async concurrency queue (5 simultaneous streams) preventing RAM/VRAM exhaustion.
 
 ### 3.2 Operational & Technical Readiness
 * **Local-First Latency:** End-to-end response generation on local Ollama (`llama3.2`) under **4 seconds** for initial token response.
@@ -50,20 +51,15 @@ Users can:
 
 ### 4.2 Scope Choices (Included vs. Excluded)
 
-```
-┌──────────────────────────────────────────────┬──────────────────────────────────────────────┐
-│             IN SCOPE (Included)              │         OUT OF SCOPE (Intentionally Excluded)│
-├──────────────────────────────────────────────┼──────────────────────────────────────────────┤
-│ • Grounded RAG with exact guest/episode tags │ • Real-time live audio transcription         │
-│ • "Ship 30 for 30" 1,250-word essay generator│   (Reason: Unnecessary latency & GPU cost;   │
-│ • Split-screen Claude-style Artifact Viewer  │    curated transcripts provide higher fidelity)│
-│ • Local Ollama + Cloud Provider switch       │ • Paid vector cloud databases (Pinecone/Qdrant│
-│ • Multi-turn session persistence (Postgres)  │   (Reason: Local SQLite/pgvector is 100%     │
-│ • Iframe HTML/CSS sandbox security layer     │    free and requires zero external accounts) │
-│ • Structured JSON logging & health checks    │ • Complex multi-tenant enterprise IAM / RBAC │
-│ • Automated test suite (Pytest + API tests)  │   (Reason: Premature optimization for demo)  │
-└──────────────────────────────────────────────┴──────────────────────────────────────────────┘
-```
+| In Scope (Included) | Out of Scope (Intentionally Excluded) | Rationale |
+| :--- | :--- | :--- |
+| **Grounded RAG** | Real-time audio transcription | Curated transcripts provide higher fidelity without audio GPU latency. |
+| **Ship 30 Essay Generator** | Complex multi-tenant enterprise RBAC | Single-tenant session isolation is optimal for internal growth advisory. |
+| **Split-Screen Artifact Viewer** | Paid cloud vector databases (Pinecone/Qdrant) | Pure-Python SQLite vector store is 100% free, private, and portable. |
+| **Local Ollama + Cloud Switch** | Multi-agent autonomous debate swarms | Deterministic schema validation guarantees reliable output quality. |
+| **PostgreSQL / SQLite Persistence** | Production audio streaming infrastructure | Text transcripts eliminate external network dependencies. |
+| **Iframe Sandbox & Rate Limiting** | Custom proprietary model training | Off-the-shelf local models (`llama3.2`) with RAG provide higher accuracy. |
+| **Automated Test Suite (18 tests)** | Paid proprietary cloud analytics suites | Local structured logging and `/health` diagnostics provide full observability. |
 
 ---
 
@@ -73,7 +69,7 @@ Users can:
 | :--- | :--- | :--- |
 | **Prompt Injection & Jailbreaks** | High | User inputs and retrieved context chunks are isolated inside strict XML boundary tags (`<transcript_context>`, `<user_query>`). The system prompt instructs the model to treat input within tags strictly as data, never as instructions. |
 | **Malicious HTML Artifacts (XSS)** | Critical | Rendered HTML artifacts are hosted inside an `<iframe sandbox="allow-scripts">` element omitting `allow-same-origin`. Sanitization via `DOMPurify` / `bleach` strips `onerror`, `onload`, inline script injection, and `javascript:` URIs. |
-| **Hallucination on Unknown Queries** | High | Embedding similarity threshold gating: If retrieved context confidence is `< 0.60`, the agent returns a standard grounded refusal: *"This topic is not covered in Lenny's Podcast transcripts."* |
+| **Hallucination on Unknown Queries** | High | Embedding similarity threshold gating: If retrieved context confidence is `< 0.25`, the agent returns a standard grounded refusal: *"This topic is not covered in Lenny's Podcast transcripts."* |
 | **Service Outages (Ollama / Cloud LLM)** | Medium | FastAPI resilience layer with timeout detection, health endpoint monitoring, and user-friendly error banners in the UI. |
 | **Database Injection (SQLi)** | High | SQLAlchemy ORM parameterized queries used across all session and message persistence layers. |
 

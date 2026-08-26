@@ -71,8 +71,8 @@ flowchart TB
 | Component | Responsibility | Technologies |
 | :--- | :--- | :--- |
 | **Frontend Web App** | Modern conversational interface, session switcher, interactive citation pills, and Claude-style split-screen Artifact Viewer. | React 18 / Vite, Vanilla CSS design system, Lucide icons. |
-| **API Gateway** | REST contracts, request validation, CORS, health checks, structured error propagation, streaming support. | FastAPI, Uvicorn, Pydantic v2. |
-| **Knowledge & RAG Engine** | Ingestion of Lenny transcripts, semantic chunking (500 tokens / 100 token overlap), embedding generation, top-k vector retrieval, and relevance scoring. | `sentence-transformers/all-MiniLM-L6-v2`, `sqlite3` + `numpy` vector store. |
+| **API Gateway** | REST contracts, request validation, CORS, health checks, sliding-window rate limiter (30 req/min), LLM concurrency semaphore (5 slots), and latency logging. | FastAPI, Uvicorn, Pydantic v2. |
+| **Knowledge & RAG Engine** | Ingestion of Lenny transcripts, semantic chunking (~500 tokens), normalized TF-IDF & Subword Bigram vector engine with topic boosting, top-k retrieval, and similarity gating (`>= 0.25`). | Pure-Python `sqlite3` + `numpy` vector store. |
 | **Agent Orchestrator** | Type-safe agent with dependency injection (`RunContext`), structured outputs (`result_type`), dynamic system prompts, XML guardrails, and citation enforcement. | **PydanticAI** (`pydantic-ai`). |
 | **Ship 30 for 30 Skill** | Specialized transformer that structures grounded insights into a 1,250-word digital essay with proven hooks, bolding, 1-3-1 cadence, and actionable summaries. | PydanticAI Skill & Structured Output Schema. |
 | **LLM Provider Abstraction** | Seamless switching between local Ollama (`llama3.2`) and Cloud providers (Anthropic/OpenAI) using PydanticAI model providers. | PydanticAI `Model` abstractions (`OllamaModel`, `AnthropicModel`, `OpenAIChatModel`). |
@@ -83,35 +83,51 @@ flowchart TB
 
 ## 3. Database Schema (PostgreSQL / SQLAlchemy)
 
-```
-┌─────────────────────────────────┐       ┌──────────────────────────────────────┐
-│           sessions              │       │               messages               │
-├─────────────────────────────────┤       ├──────────────────────────────────────┤
-│ id: UUID (PK)                   │◄──┐   │ id: UUID (PK)                        │
-│ title: VARCHAR(255)             │   │   │ session_id: UUID (FK -> sessions.id) │
-│ created_at: TIMESTAMPTZ         │   └───┼─created_at: TIMESTAMPTZ              │
-│ updated_at: TIMESTAMPTZ         │       │ role: VARCHAR(32) [user|assistant]   │
-│ metadata_json: JSONB            │       │ content: TEXT                        │
-└─────────────────────────────────┘       │ model_used: VARCHAR(64)              │
-                                          └──────────────────┬───────────────────┘
-                                                             │
-                                          ┌──────────────────┴───────────────────┐
-                                          ▼                                      ▼
-┌──────────────────────────────────────────────┐       ┌──────────────────────────────────────────────┐
-│                  citations                   │       │                  artifacts                   │
-├──────────────────────────────────────────────┤       ├──────────────────────────────────────────────┤
-│ id: UUID (PK)                                │       │ id: UUID (PK)                                │
-│ message_id: UUID (FK -> messages.id)         │       │ message_id: UUID (FK -> messages.id)         │
-│ episode_title: VARCHAR(255)                  │       │ session_id: UUID (FK -> sessions.id)         │
-│ guest: VARCHAR(128)                          │       │ artifact_type: VARCHAR(32) [markdown|html]   │
-│ timestamp_str: VARCHAR(32)                   │       │ title: VARCHAR(255)                          │
-│ snippet: TEXT                                │       │ content: TEXT                                │
-│ source_url: VARCHAR(512)                     │       │ version: INTEGER                             │
-│ similarity_score: FLOAT                      │       │ created_at: TIMESTAMPTZ                      │
-└──────────────────────────────────────────────┘       └──────────────────────────────────────────────┘
+```mermaid
+erDiagram
+    SESSIONS ||--o{ MESSAGES : contains
+    SESSIONS ||--o{ ARTIFACTS : owns
+    MESSAGES ||--o{ CITATIONS : generates
+    MESSAGES ||--o| ARTIFACTS : creates
+
+    SESSIONS {
+        string id PK
+        string title
+        datetime created_at
+        datetime updated_at
+    }
+    MESSAGES {
+        string id PK
+        string session_id FK
+        string role
+        string content
+        string model_used
+        datetime created_at
+    }
+    CITATIONS {
+        string id PK
+        string message_id FK
+        string episode_title
+        string guest
+        string timestamp_str
+        string snippet
+        float similarity_score
+        string source_url
+    }
+    ARTIFACTS {
+        string id PK
+        string session_id FK
+        string message_id FK
+        string title
+        string artifact_type
+        string content
+        int version
+        datetime created_at
+    }
 ```
 
 ---
+
 
 ## 4. API Endpoints Contract
 

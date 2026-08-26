@@ -8,7 +8,7 @@ The Lenny Growth Assistant interface is crafted to evoke modern, premium develop
 
 ### Core Principles
 1. **Side-by-Side Dual Pane ("Claude Artifacts" Paradigm):** Conversational chat on the left (or full width when no artifact is present); dynamic, interactive Artifact Viewer sliding out on the right when code, essays, or HTML snippets are generated.
-2. **High Visual Polish & Modern Dark/Light Mode:** Deep slate/zinc dark mode (`#0B0F17`) with glassmorphism, subtle glowing borders, and vibrant purple/indigo accent tones (`#6366F1`).
+2. **High Visual Polish & Royal Emerald Dark/Light Mode:** Deep obsidian forest dark mode (`#0b1210`) with rich jade cards (`#15221e`), crisp mint light mode (`#f4fbf7`), and vibrant royal emerald accent tones (`#10b981`).
 3. **Information Density with Skimmability:** Rich typography (Inter / Plus Jakarta Sans), clear hierarchical headings, interactive citation badges, and formatted callouts.
 4. **Instant Visual Feedback:** Smooth streaming indicators, skeleton loaders during RAG retrieval, and real-time status pills for active models (Ollama vs. Cloud).
 
@@ -16,51 +16,42 @@ The Lenny Growth Assistant interface is crafted to evoke modern, premium develop
 
 ## 2. Information Architecture & Layout Structure
 
-```
-+----------------------------------------------------------------------------------------------------+
-|  [Logo] Lenny Growth Assistant      [Status: Ollama llama3.2 (Local)]     [Model Switcher v] [New Chat]|
-+----------------------------------------------------------------------------------------------------+
-|  SIDEBAR           |  CHAT WORKSPACE (50% or 100%)       |  ARTIFACT VIEWER (50% Split Screen)     |
-|                    |                                     |                                         |
-|  + New Chat        |  [User Bubble]                      |  +-----------------------------------+  |
-|                    |  "Write a Ship 30 essay on PLG..."  |  | [Preview] [Raw Code]  [Copy] [X]  |  |
-|  Recents:          |                                     |  +-----------------------------------+  |
-|  - Brian Chesky PM |  [Assistant Bubble]                 |  | Sandboxed Interactive Preview:    |  |
-|  - Retention Loops |  "Here is a 1,250-word essay based  |  |                                   |  |
-|  - Onboarding UX   |   on Lenny's transcripts..."        |  | <h1>The 3 Non-Obvious Laws of PLG</h1>|
-|                    |                                     |  | <p>Most startups get product-led  |  |
-|  [Settings]        |  [Source Chips]:                    |  |   growth completely backwards...</p>|
-|  [Health: OK]      |  (Brian Chesky #42) (Elena Verna)   |  |                                   |  |
-|                    |                                     |  +-----------------------------------+  |
-|                    |  [Input: Ask anything or write...]  |  | (Rendered HTML/CSS or Markdown)   |  |
-+--------------------+-------------------------------------+-----------------------------------------+
-```
+### 2.1 Workspace Layout Hierarchy
+
+| Region | Desktop Width | Purpose & Contained Elements |
+| :--- | :--- | :--- |
+| **Top Header** | 100% (56px height) | App logo, active session title, model selector dropdown (`Llama 3.2` / Cloud), theme switcher (Dark / Light), and artifact drawer toggle. |
+| **Navigation Sidebar** | 260px fixed width | "+ New Chat" action button, chronological session history with delete triggers, and live backend/Ollama health indicator pill. |
+| **Chat Workspace** | 50% (Split) / 100% (Full) | Starter prompt cards, user prompt bubbles, grounded assistant responses, interactive citation badges `[Guest (Timestamp)]`, and the Ship 30 mode toggle. |
+| **Artifact Drawer** | 50% split-pane slideout | Sandboxed `<iframe>` preview, styled Markdown digital essay viewer, raw code inspection tab, copy-to-clipboard, file download, and expand controls. |
 
 ---
 
 ## 3. Design System & Design Tokens
 
-### 3.1 Color Palette
+### 3.1 Color Palette (Royal Emerald Green)
 ```css
 :root {
   /* Brand Accents */
-  --primary-500: #6366f1;       /* Indigo */
-  --primary-600: #4f46e5;
-  --primary-glow: rgba(99, 102, 241, 0.25);
-  --accent-purple: #8b5cf6;     /* Purple */
-  --accent-cyan: #06b6d4;       /* Cyan */
+  --primary: #10b981;           /* Emerald Primary */
+  --primary-hover: #059669;     /* Deep Forest */
+  --primary-glow: rgba(16, 185, 129, 0.2);
   
   /* Dark Mode Surfaces */
-  --bg-app: #090d16;            /* Deep Space Black */
-  --bg-surface-1: #0f172a;      /* Slate Card Surface */
-  --bg-surface-2: #1e293b;      /* Hover / Active Surface */
-  --border-subtle: #1e293b;
-  --border-highlight: #334155;
+  --bg-app: #0b1210;            /* Obsidian Forest */
+  --bg-surface: #15221e;        /* Dark Jade Surface */
+  --bg-surface-2: #1e332c;      /* Hover Surface */
+  --border: #233c34;            /* Muted Forest Border */
+  
+  /* Light Mode Surfaces */
+  --bg-app-light: #f4fbf7;      /* Crisp Mint */
+  --bg-surface-light: #ffffff;  /* Pure White */
+  --border-light: #d1fae5;
   
   /* Text Tokens */
-  --text-main: #f8fafc;
-  --text-muted: #94a3b8;
-  --text-dim: #64748b;
+  --text-main: #f0fdf4;
+  --text-muted: #86efac;
+  --text-dim: #4ade80;
   
   /* Badges & Status */
   --success: #10b981;
