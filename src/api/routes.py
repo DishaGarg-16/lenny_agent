@@ -10,6 +10,7 @@ from src.knowledge.retriever import TranscriptRetriever
 from src.agent.llm_client import get_llm_client, OllamaLLMClient
 from src.agent.core import LennyGrowthAgent
 from src.agent.skills.ship30 import Ship30Skill
+from src.security.sanitizer import sanitize_html_artifact, sanitize_user_prompt
 from .schemas import (
     HealthResponse, ModelsResponse, ModelInfo, SessionCreateRequest,
     SessionResponse, SessionDetailResponse, MessageResponse,
@@ -119,24 +120,26 @@ async def delete_session(session_id: str, db: AsyncSession = Depends(get_db)):
 
 @router.post("/api/chat", response_model=ChatResponse)
 async def chat_endpoint(req: ChatRequest, db: AsyncSession = Depends(get_db), retriever: TranscriptRetriever = Depends(get_retriever)):
-    """Grounded Conversational RAG Endpoint with persistence."""
+    """Grounded Conversational RAG Endpoint with security sanitization and persistence."""
+    clean_message = sanitize_user_prompt(req.message)
     repo = ChatRepository(db)
     session = await repo.get_session(req.session_id) if req.session_id else None
     if not session:
-        session = await repo.create_session(title=req.message[:40] + "...")
+        session = await repo.create_session(title=clean_message[:40] + "...")
     session_id = session.id
-    await repo.add_message(session_id=session_id, role="user", content=req.message)
+    await repo.add_message(session_id=session_id, role="user", content=clean_message)
     chat_history = [{"role": m.role, "content": m.content} for m in session.messages[-6:]] if session.messages else []
     llm_client = get_llm_client(req.model_override)
     agent = LennyGrowthAgent(retriever=retriever, llm_client=llm_client)
-    agent_resp = await agent.chat(user_message=req.message, chat_history=chat_history)
+    agent_resp = await agent.chat(user_message=clean_message, chat_history=chat_history)
     citations_payload = [c.model_dump() for c in agent_resp.citations]
     asst_msg = await repo.add_message(session_id=session_id, role="assistant", content=agent_resp.answer, model_used=agent_resp.model_used, citations=citations_payload)
     artifact_res = None
     if agent_resp.artifact_type and agent_resp.artifact_content:
+        clean_content = sanitize_html_artifact(agent_resp.artifact_content) if agent_resp.artifact_type == "html" else agent_resp.artifact_content
         saved_art = await repo.save_artifact(
             session_id=session_id, title=agent_resp.artifact_title or "Generated Artifact",
-            artifact_type=agent_resp.artifact_type, content=agent_resp.artifact_content, message_id=asst_msg.id
+            artifact_type=agent_resp.artifact_type, content=clean_content, message_id=asst_msg.id
         )
         artifact_res = ArtifactResponse(id=saved_art.id, session_id=saved_art.session_id, title=saved_art.title, artifact_type=saved_art.artifact_type, content=saved_art.content, version=saved_art.version, created_at=saved_art.created_at)
     return ChatResponse(
@@ -147,18 +150,19 @@ async def chat_endpoint(req: ChatRequest, db: AsyncSession = Depends(get_db), re
 @router.post("/api/skills/ship30", response_model=ChatResponse)
 async def ship30_endpoint(req: Ship30Request, db: AsyncSession = Depends(get_db), retriever: TranscriptRetriever = Depends(get_retriever)):
     """Dedicated Ship 30 for 30 essay generation endpoint."""
+    clean_topic = sanitize_user_prompt(req.topic)
     repo = ChatRepository(db)
-    session_title = f"Ship 30: {req.topic[:35]}"
+    session_title = f"Ship 30: {clean_topic[:35]}"
     session = await repo.get_session(req.session_id) if req.session_id else None
     if not session:
         session = await repo.create_session(title=session_title)
     session_id = session.id
-    user_prompt = f"Write a Ship 30 for 30 essay on: {req.topic}" + (f" (Focus: {req.guest_filter})" if req.guest_filter else "")
+    user_prompt = f"Write a Ship 30 for 30 essay on: {clean_topic}" + (f" (Focus: {req.guest_filter})" if req.guest_filter else "")
     await repo.add_message(session_id=session_id, role="user", content=user_prompt)
     llm_client = get_llm_client(req.model_override)
     skill = Ship30Skill(retriever=retriever, llm_client=llm_client)
-    essay_resp = await skill.generate_essay(topic=req.topic, guest_filter=req.guest_filter)
-    summary_text = f"Here is your **Ship 30 for 30** essay on **{req.topic}** ({essay_resp.word_count} words):\n\n> *\"{essay_resp.hook}\"*\n\nThe full essay has been loaded into the **Artifact Viewer** on the right."
+    essay_resp = await skill.generate_essay(topic=clean_topic, guest_filter=req.guest_filter)
+    summary_text = f"Here is your **Ship 30 for 30** essay on **{clean_topic}** ({essay_resp.word_count} words):\n\n> *\"{essay_resp.hook}\"*\n\nThe full essay has been loaded into the **Artifact Viewer** on the right."
     citations_payload = [c.model_dump() for c in essay_resp.citations]
     asst_msg = await repo.add_message(session_id=session_id, role="assistant", content=summary_text, model_used=llm_client.model_name, citations=citations_payload)
     saved_art = await repo.save_artifact(
