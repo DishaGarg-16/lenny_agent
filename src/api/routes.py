@@ -1,7 +1,7 @@
 import os
 from datetime import datetime, timezone
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.db.database import get_db
@@ -11,6 +11,7 @@ from src.agent.llm_client import get_llm_client, OllamaLLMClient
 from src.agent.core import LennyGrowthAgent
 from src.agent.skills.ship30 import Ship30Skill
 from src.security.sanitizer import sanitize_html_artifact, sanitize_user_prompt
+from src.security.rate_limiter import RATE_LIMITER, LLM_CONCURRENCY_SEMAPHORE
 from .schemas import (
     HealthResponse, ModelsResponse, ModelInfo, SessionCreateRequest,
     SessionResponse, SessionDetailResponse, MessageResponse,
@@ -119,8 +120,11 @@ async def delete_session(session_id: str, db: AsyncSession = Depends(get_db)):
     return None
 
 @router.post("/api/chat", response_model=ChatResponse)
-async def chat_endpoint(req: ChatRequest, db: AsyncSession = Depends(get_db), retriever: TranscriptRetriever = Depends(get_retriever)):
-    """Grounded Conversational RAG Endpoint with security sanitization and persistence."""
+async def chat_endpoint(req: ChatRequest, req_http: Request, db: AsyncSession = Depends(get_db), retriever: TranscriptRetriever = Depends(get_retriever)):
+    """Grounded Conversational RAG Endpoint with rate limiting, concurrency shield, and persistence."""
+    client_ip = req_http.client.host if req_http.client else "127.0.0.1"
+    RATE_LIMITER.check_rate_limit(client_ip)
+
     clean_message = sanitize_user_prompt(req.message)
     repo = ChatRepository(db)
     session = await repo.get_session(req.session_id) if req.session_id else None
@@ -134,7 +138,10 @@ async def chat_endpoint(req: ChatRequest, db: AsyncSession = Depends(get_db), re
     chat_history = [{"role": m.role, "content": m.content} for m in session.messages[-6:]] if session.messages else []
     llm_client = get_llm_client(req.model_override)
     agent = LennyGrowthAgent(retriever=retriever, llm_client=llm_client)
-    agent_resp = await agent.chat(user_message=clean_message, chat_history=chat_history)
+
+    async with LLM_CONCURRENCY_SEMAPHORE:
+        agent_resp = await agent.chat(user_message=clean_message, chat_history=chat_history)
+
     citations_payload = [c.model_dump() for c in agent_resp.citations]
     asst_msg = await repo.add_message(session_id=session_id, role="assistant", content=agent_resp.answer, model_used=agent_resp.model_used, citations=citations_payload)
     artifact_res = None
@@ -151,8 +158,11 @@ async def chat_endpoint(req: ChatRequest, db: AsyncSession = Depends(get_db), re
     )
 
 @router.post("/api/skills/ship30", response_model=ChatResponse)
-async def ship30_endpoint(req: Ship30Request, db: AsyncSession = Depends(get_db), retriever: TranscriptRetriever = Depends(get_retriever)):
-    """Dedicated Ship 30 for 30 essay generation endpoint."""
+async def ship30_endpoint(req: Ship30Request, req_http: Request, db: AsyncSession = Depends(get_db), retriever: TranscriptRetriever = Depends(get_retriever)):
+    """Dedicated Ship 30 for 30 essay generation endpoint with concurrency shield."""
+    client_ip = req_http.client.host if req_http.client else "127.0.0.1"
+    RATE_LIMITER.check_rate_limit(client_ip)
+
     clean_topic = sanitize_user_prompt(req.topic)
     repo = ChatRepository(db)
     session_title = f"Ship 30: {clean_topic[:35]}"
@@ -167,7 +177,9 @@ async def ship30_endpoint(req: Ship30Request, db: AsyncSession = Depends(get_db)
     await repo.add_message(session_id=session_id, role="user", content=user_prompt)
     llm_client = get_llm_client(req.model_override)
     skill = Ship30Skill(retriever=retriever, llm_client=llm_client)
-    essay_resp = await skill.generate_essay(topic=clean_topic, guest_filter=req.guest_filter)
+
+    async with LLM_CONCURRENCY_SEMAPHORE:
+        essay_resp = await skill.generate_essay(topic=clean_topic, guest_filter=req.guest_filter)
 
     # Do not create empty artifacts on rejected / out-of-scope topics
     if essay_resp.word_count == 0 or len(essay_resp.citations) == 0:
