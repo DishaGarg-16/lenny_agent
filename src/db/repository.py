@@ -14,21 +14,31 @@ class ChatRepository:
         new_session = SessionModel(title=title)
         self.session.add(new_session)
         await self.session.commit()
-        await self.session.refresh(new_session)
-        return new_session
+        session_id = new_session.id
+        return await self.get_session(session_id)
 
     async def get_session(self, session_id: str) -> Optional[SessionModel]:
         """Retrieves a session by ID with its messages, citations, and artifacts pre-loaded."""
         stmt = (
             select(SessionModel).where(SessionModel.id == session_id)
-            .options(selectinload(SessionModel.messages).selectinload(MessageModel.citations), selectinload(SessionModel.artifacts))
+            .options(
+                selectinload(SessionModel.messages).selectinload(MessageModel.citations),
+                selectinload(SessionModel.artifacts)
+            )
+            .execution_options(populate_existing=True)
         )
         result = await self.session.execute(stmt)
         return result.scalars().first()
 
     async def list_sessions(self, limit: int = 50) -> List[SessionModel]:
-        """Lists all chat sessions ordered by most recently updated."""
-        stmt = select(SessionModel).order_by(desc(SessionModel.updated_at)).limit(limit)
+        """Lists all chat sessions with messages eager-loaded, ordered by most recently updated."""
+        stmt = (
+            select(SessionModel)
+            .options(selectinload(SessionModel.messages))
+            .order_by(desc(SessionModel.updated_at))
+            .limit(limit)
+            .execution_options(populate_existing=True)
+        )
         result = await self.session.execute(stmt)
         return list(result.scalars().all())
 
@@ -65,11 +75,10 @@ class ChatRepository:
         artifact = ArtifactModel(session_id=session_id, message_id=message_id, title=title, artifact_type=artifact_type, content=content)
         self.session.add(artifact)
         await self.session.commit()
-        await self.session.refresh(artifact)
-        return artifact
+        return await self.get_artifact(artifact.id)
 
     async def get_artifact(self, artifact_id: str) -> Optional[ArtifactModel]:
         """Retrieves an artifact by ID."""
-        stmt = select(ArtifactModel).where(ArtifactModel.id == artifact_id)
+        stmt = select(ArtifactModel).where(ArtifactModel.id == artifact_id).execution_options(populate_existing=True)
         result = await self.session.execute(stmt)
         return result.scalars().first()

@@ -60,7 +60,9 @@ class Ship30Skill:
 
         hook = ""
         for line in lines:
-            cleaned = line.strip().lstrip("#").strip()
+            if line.strip().startswith("#"):
+                continue  # Skip heading lines
+            cleaned = line.strip()
             if cleaned and not cleaned.startswith("*") and not cleaned.startswith("-"):
                 sentences = re.split(r"(?<=[.!?])\s+", cleaned)
                 if sentences:
